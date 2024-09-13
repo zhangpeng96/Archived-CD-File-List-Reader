@@ -6,7 +6,8 @@ from pprint import pprint
 from time import localtime, strftime, gmtime
 import pyperclip
 from moviepy.editor import VideoFileClip
-
+import configparser
+import cv2
 
 # DISK_PATH = 'D:\Live\studio'
 # DISK_PATH = 'E:'
@@ -15,6 +16,8 @@ print('2024/9/25\n\n')
 
 while True:
 
+    config = configparser.ConfigParser(interpolation=None)
+    config.read('config.ini', encoding='utf8')
     DISK_PATH = path.normpath(input('输入光驱路径: '))
     TOTAL_SIZE = 0
     TOTAL_COUNT = 0
@@ -26,18 +29,27 @@ while True:
     for root, dirs, files in walk(DISK_PATH):
         # TOTAL_SIZE = sum(path.getsize( path.join(root,file) for file in files))
         # print(TOTAL_SIZE)
+        print('正在读取文件中，文件列表如下：\n')
         for file in files:
             status = stat( path.join(root, file) )
             TOTAL_SIZE += status.st_size
             TOTAL_COUNT += 1
             filename, ext = path.splitext(file)
             ext = ext.lstrip('.').upper()
-            print('读取文件中: {}'.format(filename))
+            print('{}'.format(filename))
             # print(status.st_size)
             if ext in MEDIA_EXT:
-                print('读取视频时长中，请稍等...')
-                video = VideoFileClip(path.join(root, file))
-                duration = video.duration
+                print('> 读取视频时长中，请稍等...')
+                try:
+                    video = VideoFileClip(path.join(root, file))
+                except:
+                    print('> FFmpeg解析时长失败，换用OpenCV重新解析...')
+                    video = cv2.VideoCapture(path.join(root, file))
+                    fps = video.get(cv2.CAP_PROP_FPS)
+                    totalNoFrames = video.get(cv2.CAP_PROP_FRAME_COUNT)
+                    duration = totalNoFrames // fps
+                else:
+                    duration = video.duration
                 TOTAL_DURATION += duration
             else:
                 duration = 0
@@ -87,15 +99,23 @@ while True:
         read_duration = strftime("%H:%M:%S", gmtime(TOTAL_DURATION))
     else:
         read_duration = ''
-    cliptext = '{year}\t\t\t\t{date}\t\t\t\t\t{size}\t{duration}\t\t{count}\t{types}'.format(
-        year = strftime("%Y", gmtime(mtime)),
-        date = strftime("%Y%m%d", gmtime(mtime)),
-        duration = read_duration,
-        size = read_size,
-        count = TOTAL_COUNT,
-        types = '、'.join(map(lambda x:x[0], type_count[:4]))
-    )
-    # print(mtime)
+    
+    try:
+        clipDict = {            
+            'year': strftime("%Y", gmtime(mtime)),
+            'date': strftime("%Y%m%d", gmtime(mtime)),
+            'duration': read_duration,
+            'size': read_size,
+            'count': TOTAL_COUNT,
+            'types': '、'.join(map(lambda x:x[0], type_count[:4]))
+        }
+        autocopy = config['output']['autocopy']
+        cliptext = autocopy.format(**clipDict)
+    except:
+        print('输出信息格式配置有误，已使用缺省模式')
+        cliptext = '{year}\t{date}\t{size}\t{duration}\t{count}\t{types}'.format(**clipDict).encode('utf-8').decode('unicode_escape')
+    else:
+        cliptext = autocopy.format(**clipDict).encode('utf-8').decode('unicode_escape')
     print(cliptext)
     print('=================================')
 
