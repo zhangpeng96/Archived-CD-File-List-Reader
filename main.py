@@ -130,7 +130,7 @@ while True:
         print('输出信息格式配置有误，已使用缺省模式')
         cliptext = '{year}\t{date}\t{size}\t{duration}\t{count}\t{types}'.format(**clipDict)
     else:
-        cliptext = autocopy.format(**clipDict).encode('utf-8').decode('unicode_escape')
+        cliptext = autocopy.encode('utf-8').decode('unicode_escape').format(**clipDict)
     print(cliptext)
     print('==================================')
 
